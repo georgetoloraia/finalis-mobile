@@ -1,0 +1,14 @@
+{
+  "fixtures": [
+    "fixtures/address/README.md",
+    "fixtures/tx/README.md",
+    "fixtures/history/README.md",
+    "fixtures/proofs/README.md",
+    "fixtures/wallet/README.md",
+    "fixtures/address",
+    "fixtures/history",
+    "fixtures/proofs",
+    "fixtures/tx",
+    "fixtures/wallet"
+  ]
+}

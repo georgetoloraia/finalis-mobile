@@ -1,0 +1,218 @@
+package com.finalis.mobile.app
+
+import com.finalis.mobile.core.model.AddressValidationResult
+import com.finalis.mobile.core.model.BalanceSnapshot
+import com.finalis.mobile.core.model.BroadcastResult
+import com.finalis.mobile.core.model.HistoryEntry
+import com.finalis.mobile.core.model.HistoryPageResult
+import com.finalis.mobile.core.model.NetworkIdentity
+import com.finalis.mobile.core.model.TxDetail
+import com.finalis.mobile.core.model.TxStatus
+import com.finalis.mobile.core.model.WalletAddress
+import com.finalis.mobile.core.model.WalletUtxo
+import com.finalis.mobile.data.lightserver.LightserverDataException
+import com.finalis.mobile.data.lightserver.LightserverRepository
+import kotlinx.coroutines.runBlocking
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
+import kotlin.test.fail
+
+class RuntimeLightserverRepositoryTest {
+    @Test
+    fun `normalize rpc url appends rpc path`() {
+        assertEquals(
+            "https://lightserver.finalis.org/rpc",
+            normalizeRpcUrl("https://lightserver.finalis.org"),
+        )
+        assertEquals(
+            "http://127.0.0.1:19444/rpc",
+            normalizeRpcUrl("http://127.0.0.1:19444/"),
+        )
+        assertEquals(
+            "https://lightserver.finalis.org/rpc",
+            normalizeRpcUrl("https://lightserver.finalis.org/rpc/"),
+        )
+    }
+
+    @Test
+    fun `failover only skips unavailable endpoint and promotes first healthy endpoint`() = runBlocking {
+        val unavailable = RpcEndpoint("https://unavailable.example/rpc")
+        val healthy = RpcEndpoint("https://healthy.example/rpc")
+        val store = FakeRpcEndpointSettingsStore(
+            PersistedRpcSettings(
+                savedEndpoints = listOf(unavailable, healthy),
+                activeEndpoint = unavailable,
+            ),
+        )
+        val repository = RuntimeLightserverRepository(
+            endpointSettingsStore = store,
+            repositoryFactory = { endpoint ->
+                when (endpoint.url) {
+                    unavailable.url -> FakeLightserverRepository(
+                        statusError = LightserverDataException("Lightserver unavailable"),
+                    )
+
+                    healthy.url -> FakeLightserverRepository(
+                        status = sampleStatus(),
+                        balance = BalanceSnapshot(
+                            address = WalletAddress("sc1test"),
+                            confirmedUnits = 42L,
+                            asset = "FINALIS",
+                            tipHeight = 99,
+                            tipHash = "abcd",
+                        ),
+                    )
+
+                    else -> fail("Unexpected endpoint ${endpoint.url}")
+                }
+            },
+        )
+
+        val balance = repository.loadBalance("sc1test")
+
+        assertEquals(42L, balance.confirmedUnits)
+        assertEquals(healthy, store.settings.activeEndpoint)
+    }
+
+    @Test
+    fun `reachable mismatched endpoint is not silently skipped during reads`() = runBlocking {
+        val wrong = RpcEndpoint("https://wrong.example/rpc")
+        val healthy = RpcEndpoint("https://healthy.example/rpc")
+        val store = FakeRpcEndpointSettingsStore(
+            PersistedRpcSettings(
+                savedEndpoints = listOf(wrong, healthy),
+                activeEndpoint = wrong,
+            ),
+        )
+        val repository = RuntimeLightserverRepository(
+            endpointSettingsStore = store,
+            repositoryFactory = { endpoint ->
+                when (endpoint.url) {
+                    wrong.url -> FakeLightserverRepository(
+                        status = sampleStatus(networkId = "wrong-network"),
+                    )
+
+                    healthy.url -> FakeLightserverRepository(
+                        status = sampleStatus(),
+                        balance = BalanceSnapshot(
+                            address = WalletAddress("sc1test"),
+                            confirmedUnits = 42L,
+                            asset = "FINALIS",
+                            tipHeight = 99,
+                            tipHash = "abcd",
+                        ),
+                    )
+
+                    else -> fail("Unexpected endpoint ${endpoint.url}")
+                }
+            },
+        )
+
+        val error = assertFailsWith<LightserverDataException> {
+            repository.loadBalance("sc1test")
+        }
+
+        assertTrue(error.message.orEmpty().contains("not Finalis mainnet"))
+        assertEquals(wrong, store.settings.activeEndpoint)
+    }
+
+    @Test
+    fun `load status returns mismatched status for explicit network mismatch handling`() = runBlocking {
+        val endpoint = RpcEndpoint("https://wrong.example/rpc")
+        val store = FakeRpcEndpointSettingsStore(
+            PersistedRpcSettings(
+                savedEndpoints = listOf(endpoint),
+                activeEndpoint = endpoint,
+            ),
+        )
+        val repository = RuntimeLightserverRepository(
+            endpointSettingsStore = store,
+            repositoryFactory = {
+                FakeLightserverRepository(
+                    status = sampleStatus(networkId = "wrong-network"),
+                )
+            },
+        )
+
+        val status = repository.loadStatus()
+
+        assertEquals("wrong-network", status.networkId)
+    }
+}
+
+private class FakeRpcEndpointSettingsStore(
+    var settings: PersistedRpcSettings,
+) : RpcEndpointSettingsStore {
+    override fun loadSettings(): PersistedRpcSettings = settings
+
+    override fun setActiveEndpoint(endpoint: RpcEndpoint) {
+        settings = PersistedRpcSettings(
+            savedEndpoints = listOf(endpoint) + settings.savedEndpoints.filterNot { it.url == endpoint.url },
+            activeEndpoint = endpoint,
+        )
+    }
+}
+
+private class FakeLightserverRepository(
+    private val status: NetworkIdentity = sampleStatus(),
+    private val balance: BalanceSnapshot = BalanceSnapshot(
+        address = WalletAddress("sc1test"),
+        confirmedUnits = 0L,
+        asset = "FINALIS",
+        tipHeight = status.tipHeight,
+        tipHash = status.tipHash,
+    ),
+    private val statusError: RuntimeException? = null,
+) : LightserverRepository {
+    override suspend fun loadStatus(): NetworkIdentity = statusError?.let { throw it } ?: status
+
+    override suspend fun validateAddress(address: String): AddressValidationResult =
+        AddressValidationResult(
+            valid = true,
+            normalizedAddress = address,
+            scriptPubKeyHex = "76a914" + "00".repeat(20) + "88ac",
+            scriptHashHex = "11".repeat(32),
+            serverNetworkMatch = true,
+        )
+
+    override suspend fun loadBalance(address: String): BalanceSnapshot = balance
+
+    override suspend fun loadUtxos(address: String): List<WalletUtxo> = emptyList()
+
+    override suspend fun loadHistoryPage(address: String, cursor: String?, limit: Int, fromHeight: Long?): HistoryPageResult =
+        HistoryPageResult(items = emptyList(), hasMore = false)
+
+    override suspend fun loadHistory(address: String, cursor: String?, limit: Int, fromHeight: Long?): List<HistoryEntry> = emptyList()
+
+    override suspend fun loadTxDetail(txid: String): TxDetail {
+        throw UnsupportedOperationException("Not used in this test")
+    }
+
+    override suspend fun findFinalizedTxDetail(txid: String): TxDetail? = null
+
+    override suspend fun broadcastTx(txHex: String): BroadcastResult =
+        BroadcastResult(
+            accepted = true,
+            txid = "abcd",
+            status = TxStatus.SUBMITTED,
+            errorCode = null,
+            error = null,
+        )
+}
+
+private fun sampleStatus(
+    networkId: String = com.finalis.mobile.core.wallet.FinalisMainnet.EXPECTED_NETWORK_ID,
+): NetworkIdentity =
+    NetworkIdentity(
+        name = com.finalis.mobile.core.wallet.FinalisMainnet.EXPECTED_NETWORK_NAME,
+        networkId = networkId,
+        protocolVersion = 1,
+        featureFlags = 1L,
+        genesisHash = com.finalis.mobile.core.wallet.FinalisMainnet.EXPECTED_GENESIS_HASH,
+        tipHeight = 99,
+        tipHash = "abcd",
+        serverTruth = "finalized_only",
+        proofsTipOnly = true,
+    )

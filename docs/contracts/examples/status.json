@@ -1,0 +1,21 @@
+{
+  "network_name": "mainnet",
+  "network_id": "a57ab83946712672c507b1bd312c5fb2",
+  "genesis_hash": "5bc5efaa355d082b1951843816de1fa56db3051fc950db9844c9f269b802f6ce",
+  "wallet_api_version": "FINALIS_WALLET_API_V1",
+  "tip": {
+    "height": 395,
+    "transition_hash": "58f05926bdfaa6bcc4b2f24c544662ce62adbd6bc9ec3a9438337c3c5de1a14a"
+  },
+  "finalized_tip": {
+    "height": 395,
+    "transition_hash": "58f05926bdfaa6bcc4b2f24c544662ce62adbd6bc9ec3a9438337c3c5de1a14a"
+  },
+  "finalized_height": 395,
+  "finalized_transition_hash": "58f05926bdfaa6bcc4b2f24c544662ce62adbd6bc9ec3a9438337c3c5de1a14a",
+  "sync": {
+    "mode": "finalized_only",
+    "snapshot_present": true,
+    "finalized_lag": 0
+  }
+}

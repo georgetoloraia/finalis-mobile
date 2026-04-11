@@ -1,0 +1,24 @@
+{
+  "items": [
+    {
+      "txid": "0d6dd96d1c8eabb0cf892baab0ba19c7cc75948491d49625ae63e6986f40b81b",
+      "height": 395,
+      "status": "finalized",
+      "direction": "receive",
+      "credited_value": 6392694080,
+      "debited_value": 0,
+      "net_value": 6392694080
+    },
+    {
+      "txid": "46caef73d6282ed2418d4a9c6e84e112ac1c6458ebc7f125a5a4d08ec68096bd",
+      "height": 394,
+      "status": "finalized",
+      "direction": "send",
+      "credited_value": 6292693080,
+      "debited_value": 5000001000,
+      "net_value": 1292692080
+    }
+  ],
+  "next_cursor": "{\"start_after\":{\"height\":394,\"txid\":\"46caef73d6282ed2418d4a9c6e84e112ac1c6458ebc7f125a5a4d08ec68096bd\"},\"from_height\":140}",
+  "has_more": true
+}

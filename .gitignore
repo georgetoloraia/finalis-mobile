@@ -1,0 +1,33 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+.coverage
+htmlcov/
+
+# Android / Gradle
+.gradle/
+**/build/
+local.properties
+captures/
+
+# Logs
+*.log
+
+# Secrets
+.env
+.env.*
+*.keystore
+*.jks
+
+# Temporary
+.tmp/

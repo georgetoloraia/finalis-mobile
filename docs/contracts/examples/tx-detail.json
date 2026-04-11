@@ -1,0 +1,25 @@
+{
+  "txid": "46caef73d6282ed2418d4a9c6e84e112ac1c6458ebc7f125a5a4d08ec68096bd",
+  "height": 80,
+  "status": "finalized",
+  "finalized_transition_hash": "c4b7eb9457e5ecf581ea22e0fc39ea09735c5c3093bb1adc17c3b4c11e4f0de7",
+  "finalized_depth": 31,
+  "inputs": [
+    {
+      "prev_txid": "a81197093f56705864d0bd6fd2ce7fb71e861de5a2e5f94dc8ec1264de47aa53",
+      "prev_vout": 0
+    }
+  ],
+  "outputs": [
+    {
+      "index": 0,
+      "value": 100000000,
+      "address": "sc1recipientexample000000000000000000000000"
+    },
+    {
+      "index": 1,
+      "value": 6292693080,
+      "address": "sc1ad4qgz3j3gzr2pez6vt6nyldcaorb4pdqzuc5b2w"
+    }
+  ]
+}
