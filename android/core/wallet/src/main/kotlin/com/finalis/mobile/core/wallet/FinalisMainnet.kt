@@ -7,4 +7,3 @@ object FinalisMainnet {
     const val EXPECTED_GENESIS_HASH: String =
         "eaae655a1eec3c876bd2e66d899fc8da93d205a5df36a2665f736387aa3cb78a"
     const val MAGIC: Long = 0x499602D2
-}
