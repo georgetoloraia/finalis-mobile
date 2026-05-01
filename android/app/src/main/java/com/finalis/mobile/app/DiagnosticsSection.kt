@@ -83,8 +83,8 @@ fun DiagnosticsSection(
             )
             endpointHealth.status?.let { status ->
                 AdvancedConnectionBlock(
-                    networkId = status.networkId,
-                    genesisHash = status.genesisHash,
+                    networkId = status.networkId ?: "(not provided)",
+                    genesisHash = status.genesisHash ?: "(not provided)",
                     finalizedTransitionHash = status.finalizedHash ?: status.tipHash,
                     walletApi = status.walletApiVersion,
                     syncHealth = if (status.healthyPeerCount != null || status.establishedPeerCount != null || status.finalizedLag != null) {
