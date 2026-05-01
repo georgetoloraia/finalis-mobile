@@ -16,8 +16,9 @@ object WalletNetworkGuard {
             )
         }
 
-        if (status.networkId != null &&
-            status.networkId.lowercase() != FinalisMainnet.EXPECTED_NETWORK_ID
+        val networkId = status.networkId
+        if (networkId != null &&
+            networkId.lowercase() != FinalisMainnet.EXPECTED_NETWORK_ID
         ) {
             return NetworkMismatch(
                 code = "invalid_network_id",
@@ -25,8 +26,9 @@ object WalletNetworkGuard {
             )
         }
 
-        if (status.genesisHash != null &&
-            status.genesisHash.lowercase() != FinalisMainnet.EXPECTED_GENESIS_HASH
+        val genesisHash = status.genesisHash
+        if (genesisHash != null &&
+            genesisHash.lowercase() != FinalisMainnet.EXPECTED_GENESIS_HASH
         ) {
             return NetworkMismatch(
                 code = "invalid_genesis_hash",
