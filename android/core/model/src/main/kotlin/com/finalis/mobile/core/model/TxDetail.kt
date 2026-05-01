@@ -6,6 +6,7 @@ data class TxDetail(
     val status: TxStatus,
     val finalizedTransitionHash: String?,
     val finalizedDepth: Long? = null,
+    val creditSafe: Boolean = false,
     val inputs: List<TxInput>,
     val outputs: List<TxOutput>,
 )

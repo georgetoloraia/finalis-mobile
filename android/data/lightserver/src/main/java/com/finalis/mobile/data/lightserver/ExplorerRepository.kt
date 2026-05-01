@@ -54,6 +54,8 @@ class ExplorerRepository(
         }
         return NetworkIdentity(
             name = status.network,
+            networkId = status.networkId,
+            genesisHash = status.genesisHash,
             tipHeight = status.finalizedHeight,
             tipHash = status.finalizedTransitionHash,
             finalizedHeight = status.finalizedHeight,
@@ -369,6 +371,8 @@ private data class ExplorerStatusDto(
     @SerialName("finalized_height") val finalizedHeight: Long,
     @SerialName("finalized_transition_hash") val finalizedTransitionHash: String,
     @SerialName("backend_version") val backendVersion: String? = null,
+    @SerialName("network_id") val networkId: String? = null,
+    @SerialName("genesis_hash") val genesisHash: String? = null,
     @SerialName("ticket_pow") val ticketPow: ExplorerTicketPowDto? = null,
     @SerialName("finalized_only") val finalizedOnly: Boolean = true,
 )
@@ -490,7 +494,8 @@ private fun ExplorerTxDto.toTxDetail(): TxDetail = TxDetail(
     height = finalizedHeight!!,
     status = TxStatus.FINALIZED,
     finalizedTransitionHash = transitionHash?.lowercase(),
-    finalizedDepth = 1, // explorer summary; depth not exposed
-    inputs = emptyList(),  // explorer does not return raw inputs
-    outputs = emptyList(), // explorer does not return raw outputs
+    finalizedDepth = 1,
+    creditSafe = creditSafe,
+    inputs = emptyList(),
+    outputs = emptyList(),
 )
