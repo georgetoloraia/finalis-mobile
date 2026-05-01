@@ -1,7 +1,7 @@
 {
   "network_name": "mainnet",
-  "network_id": "a57ab83946712672c507b1bd312c5fb2",
-  "genesis_hash": "5bc5efaa355d082b1951843816de1fa56db3051fc950db9844c9f269b802f6ce",
+  "network_id": "fe561911730912cced1e83bc273fab13",
+  "genesis_hash": "eaae655a1eec3c876bd2e66d899fc8da93d205a5df36a2665f736387aa3cb78a",
   "wallet_api_version": "FINALIS_WALLET_API_V1",
   "tip": {
     "height": 395,
