@@ -16,14 +16,18 @@ object WalletNetworkGuard {
             )
         }
 
-        if (status.networkId.lowercase() != FinalisMainnet.EXPECTED_NETWORK_ID) {
+        if (status.networkId != null &&
+            status.networkId.lowercase() != FinalisMainnet.EXPECTED_NETWORK_ID
+        ) {
             return NetworkMismatch(
                 code = "invalid_network_id",
                 message = "This endpoint is not Finalis mainnet.",
             )
         }
 
-        if (status.genesisHash.lowercase() != FinalisMainnet.EXPECTED_GENESIS_HASH) {
+        if (status.genesisHash != null &&
+            status.genesisHash.lowercase() != FinalisMainnet.EXPECTED_GENESIS_HASH
+        ) {
             return NetworkMismatch(
                 code = "invalid_genesis_hash",
                 message = "This endpoint is not Finalis mainnet.",

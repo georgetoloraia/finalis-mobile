@@ -1,21 +1,17 @@
 {
-  "network_name": "mainnet",
-  "network_id": "fe561911730912cced1e83bc273fab13",
-  "genesis_hash": "eaae655a1eec3c876bd2e66d899fc8da93d205a5df36a2665f736387aa3cb78a",
-  "wallet_api_version": "FINALIS_WALLET_API_V1",
-  "tip": {
-    "height": 395,
-    "transition_hash": "58f05926bdfaa6bcc4b2f24c544662ce62adbd6bc9ec3a9438337c3c5de1a14a"
-  },
-  "finalized_tip": {
-    "height": 395,
-    "transition_hash": "58f05926bdfaa6bcc4b2f24c544662ce62adbd6bc9ec3a9438337c3c5de1a14a"
-  },
+  "network": "mainnet",
   "finalized_height": 395,
   "finalized_transition_hash": "58f05926bdfaa6bcc4b2f24c544662ce62adbd6bc9ec3a9438337c3c5de1a14a",
-  "sync": {
-    "mode": "finalized_only",
-    "snapshot_present": true,
-    "finalized_lag": 0
-  }
+  "backend_version": "finalis-lightserver/1.x",
+  "ticket_pow": {
+    "difficulty": 10,
+    "difficulty_min": 8,
+    "difficulty_max": 12,
+    "epoch_health": "healthy",
+    "streak_up": 1,
+    "streak_down": 0,
+    "nonce_search_limit": 4096,
+    "bonus_cap_bps": 1000
+  },
+  "finalized_only": true
 }

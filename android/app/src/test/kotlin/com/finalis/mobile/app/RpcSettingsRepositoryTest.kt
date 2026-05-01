@@ -16,7 +16,7 @@ class RpcSettingsRepositoryTest {
         assertEquals(
             listOf(
                 RpcEndpoint(normalizeRpcUrl(BuildConfig.LIGHTSERVER_RPC_URL)),
-                RpcEndpoint("http://212.58.103.170:19444/rpc"),
+                    RpcEndpoint("http://212.58.103.170:18080"),
             ),
             settings.savedEndpoints,
         )
@@ -38,13 +38,13 @@ class RpcSettingsRepositoryTest {
 
         assertEquals(
             listOf(
-                RpcEndpoint("https://good.example/rpc"),
+                    RpcEndpoint("https://good.example"),
                 RpcEndpoint(normalizeRpcUrl(BuildConfig.LIGHTSERVER_RPC_URL)),
-                RpcEndpoint("http://212.58.103.170:19444/rpc"),
+                    RpcEndpoint("http://212.58.103.170:18080"),
             ),
             settings.savedEndpoints,
         )
-        assertEquals(RpcEndpoint("https://good.example/rpc"), settings.activeEndpoint)
+            assertEquals(RpcEndpoint("https://good.example"), settings.activeEndpoint)
     }
 }
 

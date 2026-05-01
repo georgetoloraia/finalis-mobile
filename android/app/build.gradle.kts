@@ -8,6 +8,8 @@ val useMockLightserver =
     providers.gradleProperty("finalis.useMockLightserver").orElse("false").map(String::toBoolean)
 val lightserverRpcUrl =
     providers.gradleProperty("finalis.lightserverRpcUrl").orElse("http://85.217.171.168:19444/rpc")
+val explorerBaseUrl =
+     providers.gradleProperty("finalis.explorerBaseUrl").orElse("http://85.217.171.168:18080")
 
 android {
     buildToolsVersion = "36.0.0"
@@ -22,6 +24,7 @@ android {
         versionName = "0.1.0"
         buildConfigField("boolean", "USE_MOCK_LIGHTSERVER", useMockLightserver.get().toString())
         buildConfigField("String", "LIGHTSERVER_RPC_URL", "\"${lightserverRpcUrl.get()}\"")
+            buildConfigField("String", "EXPLORER_BASE_URL", "\"${explorerBaseUrl.get()}\"")
     }
 
     buildFeatures {
@@ -61,6 +64,9 @@ gradle.taskGraph.whenReady {
         check(lightserverRpcUrl.get().startsWith("https://")) {
             "Release builds must use an HTTPS lightserver RPC URL. Pass -Pfinalis.lightserverRpcUrl=https://host/rpc."
         }
+            check(explorerBaseUrl.get().startsWith("https://")) {
+                "Release builds must use an HTTPS explorer URL. Pass -Pfinalis.explorerBaseUrl=https://host."
+            }
     }
 }
 

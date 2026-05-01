@@ -21,19 +21,29 @@ import kotlin.test.fail
 
 class RuntimeLightserverRepositoryTest {
     @Test
-    fun `normalize rpc url appends rpc path`() {
-        assertEquals(
-            "https://lightserver.finalis.org/rpc",
-            normalizeRpcUrl("https://lightserver.finalis.org"),
-        )
-        assertEquals(
-            "http://127.0.0.1:19444/rpc",
-            normalizeRpcUrl("http://127.0.0.1:19444/"),
-        )
-        assertEquals(
-            "https://lightserver.finalis.org/rpc",
-            normalizeRpcUrl("https://lightserver.finalis.org/rpc/"),
-        )
+        fun `normalize endpoint url accepts explorer base urls`() {
+            assertEquals(
+                "https://lightserver.finalis.org",
+                normalizeRpcUrl("https://lightserver.finalis.org"),
+            )
+            assertEquals(
+                "http://127.0.0.1:19444",
+                normalizeRpcUrl("http://127.0.0.1:19444/"),
+            )
+        }
+
+        @Test
+        fun `normalize endpoint url migrates legacy rpc urls to explorer format`() {
+            // Port 19444/rpc → port 18080
+            assertEquals(
+                "http://127.0.0.1:18080",
+                normalizeRpcUrl("http://127.0.0.1:19444/rpc"),
+            )
+            // Non-19444 rpc path → strip /rpc, keep port
+            assertEquals(
+                "https://lightserver.finalis.org",
+                normalizeRpcUrl("https://lightserver.finalis.org/rpc"),
+            )
     }
 
     @Test

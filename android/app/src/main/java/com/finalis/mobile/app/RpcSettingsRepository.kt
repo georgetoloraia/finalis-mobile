@@ -19,6 +19,9 @@ import com.finalis.mobile.data.lightserver.LightserverRepository
 import com.finalis.mobile.data.lightserver.LiveLightserverRepository
 import com.finalis.mobile.data.lightserver.MockLightserverRepository
 import com.finalis.mobile.data.lightserver.UrlConnectionLightserverTransport
+import com.finalis.mobile.data.lightserver.ExplorerRepository
+import com.finalis.mobile.data.lightserver.normalizeExplorerUrl
+import com.finalis.mobile.data.lightserver.rpcUrlFromExplorerUrl
 import java.net.URI
 
 data class PersistedRpcSettings(
@@ -129,7 +132,7 @@ class RpcSettingsRepository(
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .mapNotNull { candidate ->
-                runCatching { RpcEndpoint(normalizeRpcUrl(candidate)) }.getOrNull()
+                 runCatching { RpcEndpoint(normalizeExplorerUrl(candidate)) }.getOrNull()
             }
             .distinctBy { it.url }
             .toList()
@@ -139,21 +142,21 @@ class RpcSettingsRepository(
         private const val KEY_ENDPOINTS = "saved_endpoints"
         private const val KEY_ACTIVE_ENDPOINT = "active_endpoint"
         internal val BUILTIN_FALLBACK_ENDPOINTS = listOf(
-            "http://85.217.171.168:19444/rpc",
-            "http://212.58.103.170:19444/rpc",
+                "http://85.217.171.168:18080",
+                "http://212.58.103.170:18080",
         )
     }
 }
 
 private fun defaultRpcEndpoints(): List<RpcEndpoint> =
-    (listOf(BuildConfig.LIGHTSERVER_RPC_URL) + RpcSettingsRepository.BUILTIN_FALLBACK_ENDPOINTS)
-        .map { normalizeRpcUrl(it) }
+    (listOf(BuildConfig.EXPLORER_BASE_URL) + RpcSettingsRepository.BUILTIN_FALLBACK_ENDPOINTS)
+        .map { normalizeExplorerUrl(it) }
         .distinct()
         .map(::RpcEndpoint)
 
 class RuntimeLightserverRepository(
     private val endpointSettingsStore: RpcEndpointSettingsStore,
-    private val repositoryFactory: (RpcEndpoint) -> LightserverRepository = ::liveLightserverRepositoryFor,
+    private val repositoryFactory: (RpcEndpoint) -> LightserverRepository = ::explorerRepositoryFor,
 ) : LightserverRepository {
     override suspend fun loadStatus(): NetworkIdentity {
         val endpoints = endpointSettingsStore.loadSettings().orderedEndpoints()
@@ -276,7 +279,7 @@ class RuntimeLightserverRepository(
 
 suspend fun probeRpcEndpoint(
     endpoint: RpcEndpoint,
-    repositoryFactory: (RpcEndpoint) -> LightserverRepository = ::liveLightserverRepositoryFor,
+    repositoryFactory: (RpcEndpoint) -> LightserverRepository = ::explorerRepositoryFor,
 ): EndpointProbeResult {
     return try {
         val repository = repositoryFactory(endpoint)
@@ -306,37 +309,14 @@ fun createLightserverRepository(
         )
     }
 
-fun normalizeRpcUrl(rawUrl: String): String {
-    val trimmed = rawUrl.trim()
-    require(trimmed.isNotEmpty()) { "Endpoint URL is required" }
-    val parsed = try {
-        URI(trimmed)
-    } catch (error: Exception) {
-        throw IllegalArgumentException("Endpoint URL is invalid", error)
-    }
-    val scheme = parsed.scheme?.lowercase()
-    require(scheme == "http" || scheme == "https") { "Endpoint URL must start with http:// or https://" }
-    require(!parsed.host.isNullOrBlank()) { "Endpoint URL must include a host" }
-    val trimmedPath = parsed.path.orEmpty().trimEnd('/')
-    val path = when {
-        trimmedPath.isEmpty() -> "/rpc"
-        trimmedPath.endsWith("/rpc") -> trimmedPath
-        else -> "$trimmedPath/rpc"
-    }
-    return URI(
-        scheme,
-        parsed.userInfo,
-        parsed.host,
-        parsed.port,
-        path,
-        null,
-        null,
-    ).toString()
-}
+// normalizeRpcUrl kept for callers that still pass lightserver RPC URLs;
+// new code should use normalizeExplorerUrl from ExplorerRepository.kt.
+fun normalizeRpcUrl(rawUrl: String): String = normalizeExplorerUrl(rawUrl)
 
-private fun liveLightserverRepositoryFor(endpoint: RpcEndpoint): LightserverRepository =
-    LiveLightserverRepository(
-        transport = UrlConnectionLightserverTransport(endpoint.url),
+private fun explorerRepositoryFor(endpoint: RpcEndpoint): LightserverRepository =
+    ExplorerRepository(
+        explorerBaseUrl = endpoint.url,
+        lightserverRpcUrl = rpcUrlFromExplorerUrl(endpoint.url),
     )
 
 private fun probeDisplayMessage(probe: EndpointProbeResult): String =
