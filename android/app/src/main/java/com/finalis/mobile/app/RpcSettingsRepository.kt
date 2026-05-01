@@ -11,18 +11,15 @@ import com.finalis.mobile.core.model.NetworkIdentity
 import com.finalis.mobile.core.model.TxDetail
 import com.finalis.mobile.core.model.WalletUtxo
 import com.finalis.mobile.core.wallet.WalletNetworkGuard
+import com.finalis.mobile.data.lightserver.ExplorerRepository
 import com.finalis.mobile.data.lightserver.LightserverAddressException
 import com.finalis.mobile.data.lightserver.LightserverBackendIncompatibleException
 import com.finalis.mobile.data.lightserver.LightserverDataException
-import com.finalis.mobile.data.lightserver.LightserverRpcException
 import com.finalis.mobile.data.lightserver.LightserverRepository
-import com.finalis.mobile.data.lightserver.LiveLightserverRepository
+import com.finalis.mobile.data.lightserver.LightserverRpcException
 import com.finalis.mobile.data.lightserver.MockLightserverRepository
-import com.finalis.mobile.data.lightserver.UrlConnectionLightserverTransport
-import com.finalis.mobile.data.lightserver.ExplorerRepository
 import com.finalis.mobile.data.lightserver.normalizeExplorerUrl
 import com.finalis.mobile.data.lightserver.rpcUrlFromExplorerUrl
-import java.net.URI
 
 data class PersistedRpcSettings(
     val savedEndpoints: List<RpcEndpoint>,
@@ -132,7 +129,7 @@ class RpcSettingsRepository(
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .mapNotNull { candidate ->
-                 runCatching { RpcEndpoint(normalizeExplorerUrl(candidate)) }.getOrNull()
+                runCatching { RpcEndpoint(normalizeExplorerUrl(candidate)) }.getOrNull()
             }
             .distinctBy { it.url }
             .toList()
@@ -142,8 +139,8 @@ class RpcSettingsRepository(
         private const val KEY_ENDPOINTS = "saved_endpoints"
         private const val KEY_ACTIVE_ENDPOINT = "active_endpoint"
         internal val BUILTIN_FALLBACK_ENDPOINTS = listOf(
-                "http://85.217.171.168:18080",
-                "http://212.58.103.170:18080",
+            "http://85.217.171.168:18080",
+            "http://64.23.244.126:18080",
         )
     }
 }

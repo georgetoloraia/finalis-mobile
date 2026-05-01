@@ -15,12 +15,12 @@ class RpcSettingsRepositoryTest {
 
         assertEquals(
             listOf(
-                RpcEndpoint(normalizeRpcUrl(BuildConfig.LIGHTSERVER_RPC_URL)),
-                    RpcEndpoint("http://212.58.103.170:18080"),
+                RpcEndpoint(normalizeRpcUrl(BuildConfig.EXPLORER_BASE_URL)),
+                RpcEndpoint("http://212.58.103.170:18080"),
             ),
             settings.savedEndpoints,
         )
-        assertEquals(RpcEndpoint(normalizeRpcUrl(BuildConfig.LIGHTSERVER_RPC_URL)), settings.activeEndpoint)
+        assertEquals(RpcEndpoint(normalizeRpcUrl(BuildConfig.EXPLORER_BASE_URL)), settings.activeEndpoint)
     }
     @Test
     fun `load settings ignores malformed persisted endpoints`() {
@@ -39,7 +39,7 @@ class RpcSettingsRepositoryTest {
         assertEquals(
             listOf(
                     RpcEndpoint("https://good.example"),
-                RpcEndpoint(normalizeRpcUrl(BuildConfig.LIGHTSERVER_RPC_URL)),
+                RpcEndpoint(normalizeRpcUrl(BuildConfig.EXPLORER_BASE_URL)),
                     RpcEndpoint("http://212.58.103.170:18080"),
             ),
             settings.savedEndpoints,
