@@ -305,6 +305,31 @@ class LiveLightserverRepository(
         )
     }
 
+    // Add these helper functions for computing scripthash locally
+    private fun computeScriptHashLocally(scriptPubKeyHex: String): String {
+        // Convert script_pubkey_hex to bytes
+        val scriptBytes = hexStringToByteArray(scriptPubKeyHex)
+
+        // Compute SHA256
+        val digest = MessageDigest.getInstance("SHA-256")
+        val hash = digest.digest(scriptBytes)
+
+        // Convert to hex string (32 bytes = 64 hex chars)
+        return hash.joinToString("") { "%02x".format(it) }
+    }
+
+    private fun hexStringToByteArray(hex: String): ByteArray {
+        val cleanHex = hex.lowercase().trim()
+        require(cleanHex.length % 2 == 0) { "Invalid hex string length: ${cleanHex.length}" }
+
+        return ByteArray(cleanHex.length / 2).also { bytes ->
+            for (i in cleanHex.indices step 2) {
+                val byteValue = cleanHex.substring(i, i + 2).toInt(16)
+                bytes[i / 2] = byteValue.toByte()
+            }
+        }
+    }
+
     private suspend fun requireValidatedAddress(address: String): ValidatedAddressContext {
         val validation = validateAddress(address)
         if (!validation.valid) {
@@ -313,10 +338,20 @@ class LiveLightserverRepository(
         if (validation.serverNetworkMatch != true) {
             throw LightserverAddressException("Address does not match the connected network", wrongNetwork = true)
         }
+
+        // Get scriptPubKeyHex (required)
+        val scriptPubKeyHex = validation.scriptPubKeyHex ?: error("Address validation missing script_pubkey_hex")
+
+        // If server didn't provide scripthash, compute it locally from script_pubkey_hex
+        val scriptHashHex = validation.scriptHashHex ?: run {
+            android.util.Log.w("LightserverRepo", "Server didn't provide scripthash_hex, computing locally")
+            computeScriptHashLocally(scriptPubKeyHex)
+        }
+
         return ValidatedAddressContext(
             normalizedAddress = validation.normalizedAddress ?: address,
-            scriptPubKeyHex = validation.scriptPubKeyHex ?: error("Address validation missing script_pubkey_hex"),
-            scriptHashHex = validation.scriptHashHex ?: error("Address validation missing scripthash_hex"),
+            scriptPubKeyHex = scriptPubKeyHex,
+            scriptHashHex = scriptHashHex,
         )
     }
 
@@ -356,14 +391,24 @@ class LiveLightserverRepository(
 
     private fun requireCompatibleAddressValidation(validation: ValidateAddressDto) {
         if (!validation.valid) return
+        
+        // Make scripthash_hex optional since we can compute it locally
         if (validation.normalizedAddress.isNullOrBlank() ||
             validation.scriptPubKeyHex.isNullOrBlank() ||
-            validation.scriptHashHex.isNullOrBlank() ||
+            // validation.scriptHashHex.isNullOrBlank() - REMOVED this check
             validation.serverNetworkHrp.isNullOrBlank() ||
             validation.serverNetworkMatch == null ||
             validation.addressType != "p2pkh"
         ) {
-            throw LightserverBackendIncompatibleException("Lightserver validate_address response is missing live address fields")
+            throw LightserverBackendIncompatibleException(
+                "Lightserver validate_address response is missing live address fields. " +
+                "Present fields: normalizedAddress=${validation.normalizedAddress != null}, " +
+                "scriptPubKeyHex=${validation.scriptPubKeyHex != null}, " +
+                "scriptHashHex=${validation.scriptHashHex != null}, " +
+                "serverNetworkHrp=${validation.serverNetworkHrp != null}, " +
+                "serverNetworkMatch=${validation.serverNetworkMatch != null}, " +
+                "addressType=${validation.addressType}"
+            )
         }
     }
 

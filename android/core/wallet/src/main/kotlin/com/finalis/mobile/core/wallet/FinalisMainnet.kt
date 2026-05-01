@@ -3,7 +3,8 @@ package com.finalis.mobile.core.wallet
 object FinalisMainnet {
     const val EXPECTED_NETWORK_NAME: String = "mainnet"
     const val EXPECTED_HRP: String = "sc"
-    const val EXPECTED_NETWORK_ID: String = "a57ab83946712672c507b1bd312c5fb2"
+    const val EXPECTED_NETWORK_ID: String = "fe561911730912cced1e83bc273fab13"
     const val EXPECTED_GENESIS_HASH: String =
-        "5bc5efaa355d082b1951843816de1fa56db3051fc950db9844c9f269b802f6ce"
+        "eaae655a1eec3c876bd2e66d899fc8da93d205a5df36a2665f736387aa3cb78a"
+    const val MAGIC: Long = 0x499602D2
 }
