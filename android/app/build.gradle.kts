@@ -34,7 +34,9 @@ android {
             manifestPlaceholders["usesCleartextTraffic"] = "true"
         }
         release {
-            manifestPlaceholders["usesCleartextTraffic"] = "false"
+            // Mainnet operators currently expose HTTP endpoints on :18080/:19444.
+            // Keep release cleartext-enabled until HTTPS endpoints are mandatory.
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
             isMinifyEnabled = false
             isShrinkResources = false
         }

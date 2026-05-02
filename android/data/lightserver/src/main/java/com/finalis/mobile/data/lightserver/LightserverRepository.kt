@@ -9,6 +9,12 @@ import com.finalis.mobile.core.model.NetworkIdentity
 import com.finalis.mobile.core.model.TxDetail
 import com.finalis.mobile.core.model.WalletUtxo
 
+data class UtxoDiagnosticsSnapshot(
+    val totalReturned: Int,
+    val finalizedKept: Int,
+    val filteredPending: Int,
+)
+
 interface LightserverRepository {
     suspend fun loadStatus(): NetworkIdentity
     suspend fun validateAddress(address: String): AddressValidationResult
@@ -19,4 +25,5 @@ interface LightserverRepository {
     suspend fun loadTxDetail(txid: String): TxDetail
     suspend fun findFinalizedTxDetail(txid: String): TxDetail?
     suspend fun broadcastTx(txHex: String): BroadcastResult
+    fun lastUtxoDiagnostics(): UtxoDiagnosticsSnapshot? = null
 }

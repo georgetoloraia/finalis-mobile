@@ -191,7 +191,7 @@ fun WalletHomeSection(
 ) {
     WalletPanel(
         title = "Wallet overview",
-        subtitle = "Finalized balance and current sendable amount.",
+        subtitle = "Spendable balance and current sendable amount.",
     ) {
         Surface(
             shape = MaterialTheme.shapes.medium,
@@ -205,7 +205,7 @@ fun WalletHomeSection(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = "FINALIZED BALANCE",
+                        text = "SPENDABLE BALANCE",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

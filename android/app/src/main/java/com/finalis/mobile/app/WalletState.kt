@@ -10,6 +10,8 @@ import com.finalis.mobile.core.model.TxDirection
 import com.finalis.mobile.core.model.TxStatus
 import com.finalis.mobile.core.model.WalletOutPoint
 import com.finalis.mobile.core.model.WalletUtxo
+import com.finalis.mobile.data.lightserver.UtxoDiagnosticsSnapshot
+import com.finalis.mobile.data.lightserver.rpcUrlFromExplorerUrl
 import com.finalis.mobile.core.wallet.NetworkMismatch as WalletNetworkMismatch
 
 sealed interface DashboardState {
@@ -100,6 +102,8 @@ enum class SyncTrustState {
 
 data class EndpointHealthState(
     val activeEndpoint: RpcEndpoint? = null,
+    val resolvedExplorerUrl: String? = null,
+    val resolvedRpcUrl: String? = null,
     val reachability: EndpointReachabilityState = EndpointReachabilityState.UNKNOWN,
     val syncTrust: SyncTrustState = SyncTrustState.UNKNOWN,
     val status: NetworkIdentity? = null,
@@ -112,7 +116,9 @@ data class EndpointHealthState(
 
 data class DiagnosticsState(
     val endpointHealth: EndpointHealthState = EndpointHealthState(),
+    val endpointProbes: List<EndpointProbeResult> = emptyList(),
     val txDebugRecords: List<TxDebugRecord> = emptyList(),
+    val utxoDiagnostics: UtxoDiagnosticsSnapshot? = null,
 )
 
 data class RpcEndpoint(
@@ -139,6 +145,7 @@ data class EndpointProbeResult(
 data class EndpointFailure(
     val kind: EndpointErrorKind,
     val message: String,
+    val rawMessage: String? = null,
 )
 
 data class FinalizedHistoryState(
@@ -267,16 +274,20 @@ fun buildDiagnosticsState(
     status: NetworkIdentity?,
     mismatch: WalletNetworkMismatch? = null,
     error: EndpointFailure? = null,
+    endpointProbes: List<EndpointProbeResult> = emptyList(),
     txDebugRecords: List<TxDebugRecord> = emptyList(),
+    utxoDiagnostics: UtxoDiagnosticsSnapshot? = null,
 ): DiagnosticsState {
     val endpointHealth = when {
         activeEndpoint == null -> EndpointHealthState()
         error != null -> EndpointHealthState(
             activeEndpoint = activeEndpoint,
+            resolvedExplorerUrl = activeEndpoint.url,
+            resolvedRpcUrl = rpcUrlFromExplorerUrl(activeEndpoint.url),
             reachability = if (error.kind == EndpointErrorKind.UNAVAILABLE) EndpointReachabilityState.UNREACHABLE else EndpointReachabilityState.REACHABLE,
             syncTrust = if (error.kind == EndpointErrorKind.UNAVAILABLE) SyncTrustState.UNREACHABLE else SyncTrustState.DEGRADED,
             errorKind = error.kind,
-            errorMessage = error.message,
+            errorMessage = error.rawMessage ?: error.message,
             summary = when (error.kind) {
                 EndpointErrorKind.UNAVAILABLE -> "Endpoint unreachable"
                 EndpointErrorKind.RPC_ERROR -> "Endpoint RPC error"
@@ -291,6 +302,8 @@ fun buildDiagnosticsState(
 
         mismatch != null -> EndpointHealthState(
             activeEndpoint = activeEndpoint,
+            resolvedExplorerUrl = activeEndpoint.url,
+            resolvedRpcUrl = rpcUrlFromExplorerUrl(activeEndpoint.url),
             reachability = EndpointReachabilityState.REACHABLE,
             syncTrust = SyncTrustState.MISMATCHED,
             status = status,
@@ -302,13 +315,17 @@ fun buildDiagnosticsState(
         status != null -> buildHealthyOrDegradedEndpointHealth(activeEndpoint, status)
         else -> EndpointHealthState(
             activeEndpoint = activeEndpoint,
+            resolvedExplorerUrl = activeEndpoint.url,
+            resolvedRpcUrl = rpcUrlFromExplorerUrl(activeEndpoint.url),
             summary = "Endpoint status unknown",
             detail = "No endpoint health information is currently available.",
         )
     }
     return DiagnosticsState(
         endpointHealth = endpointHealth,
+        endpointProbes = endpointProbes,
         txDebugRecords = txDebugRecords,
+        utxoDiagnostics = utxoDiagnostics,
     )
 }
 
@@ -497,7 +514,7 @@ private fun buildHealthyOrDegradedEndpointHealth(
 ): EndpointHealthState {
     val degradedReasons = mutableListOf<String>()
     val finalizedLag = status.finalizedLag
-    if (status.syncSnapshotPresent != true) {
+    if (status.syncSnapshotPresent == false) {
         degradedReasons += "Sync snapshot is unavailable."
     }
     if (status.bootstrapSyncIncomplete == true) {
@@ -512,18 +529,18 @@ private fun buildHealthyOrDegradedEndpointHealth(
     if (status.nextHeightProposerAvailable == false) {
         degradedReasons += "Next-height proposer data is unavailable."
     }
-    if (status.observedNetworkHeightKnown != true) {
+    if (status.observedNetworkHeightKnown == false) {
         degradedReasons += "Observed network height is unknown."
     }
-    if (finalizedLag == null) {
-        degradedReasons += "Finalized lag is unavailable."
-    } else if (finalizedLag > 2L) {
+    if (finalizedLag != null && finalizedLag > 2L) {
         degradedReasons += "Finalized lag is $finalizedLag blocks."
     }
 
     return if (degradedReasons.isEmpty()) {
         EndpointHealthState(
             activeEndpoint = activeEndpoint,
+            resolvedExplorerUrl = activeEndpoint.url,
+            resolvedRpcUrl = rpcUrlFromExplorerUrl(activeEndpoint.url),
             reachability = EndpointReachabilityState.REACHABLE,
             syncTrust = SyncTrustState.HEALTHY,
             status = status,
@@ -533,6 +550,8 @@ private fun buildHealthyOrDegradedEndpointHealth(
     } else {
         EndpointHealthState(
             activeEndpoint = activeEndpoint,
+            resolvedExplorerUrl = activeEndpoint.url,
+            resolvedRpcUrl = rpcUrlFromExplorerUrl(activeEndpoint.url),
             reachability = EndpointReachabilityState.REACHABLE,
             syncTrust = SyncTrustState.DEGRADED,
             status = status,

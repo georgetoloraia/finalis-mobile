@@ -21,29 +21,34 @@ import kotlin.test.fail
 
 class RuntimeLightserverRepositoryTest {
     @Test
-        fun `normalize endpoint url accepts explorer base urls`() {
-            assertEquals(
-                "https://lightserver.finalis.org",
-                normalizeRpcUrl("https://lightserver.finalis.org"),
-            )
-            assertEquals(
-                "http://127.0.0.1:19444",
-                normalizeRpcUrl("http://127.0.0.1:19444/"),
-            )
-        }
+    fun `normalize endpoint url accepts explorer base urls`() {
+        assertEquals(
+            "https://lightserver.finalis.org",
+            normalizeRpcUrl("https://lightserver.finalis.org"),
+        )
+        assertEquals(
+            "http://127.0.0.1:18080",
+            normalizeRpcUrl("http://127.0.0.1:19444/"),
+        )
+    }
 
-        @Test
-        fun `normalize endpoint url migrates legacy rpc urls to explorer format`() {
-            // Port 19444/rpc → port 18080
-            assertEquals(
-                "http://127.0.0.1:18080",
-                normalizeRpcUrl("http://127.0.0.1:19444/rpc"),
-            )
-            // Non-19444 rpc path → strip /rpc, keep port
-            assertEquals(
-                "https://lightserver.finalis.org",
-                normalizeRpcUrl("https://lightserver.finalis.org/rpc"),
-            )
+    @Test
+    fun `normalize endpoint url migrates legacy rpc urls to explorer format`() {
+        // Port 19444/rpc → port 18080
+        assertEquals(
+            "http://127.0.0.1:18080",
+            normalizeRpcUrl("http://127.0.0.1:19444/rpc"),
+        )
+        // Non-19444 rpc path → strip /rpc, keep port
+        assertEquals(
+            "https://lightserver.finalis.org",
+            normalizeRpcUrl("https://lightserver.finalis.org/rpc"),
+        )
+        // Full API paths should be normalized to base explorer endpoint
+        assertEquals(
+            "http://64.23.244.126:18080",
+            normalizeRpcUrl("http://64.23.244.126:18080/api/status"),
+        )
     }
 
     @Test

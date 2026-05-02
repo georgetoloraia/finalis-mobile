@@ -18,6 +18,7 @@ import com.finalis.mobile.data.lightserver.LightserverDataException
 import com.finalis.mobile.data.lightserver.LightserverRepository
 import com.finalis.mobile.data.lightserver.LightserverRpcException
 import com.finalis.mobile.data.lightserver.MockLightserverRepository
+import com.finalis.mobile.data.lightserver.UtxoDiagnosticsSnapshot
 import com.finalis.mobile.data.lightserver.normalizeExplorerUrl
 import com.finalis.mobile.data.lightserver.rpcUrlFromExplorerUrl
 
@@ -155,10 +156,14 @@ class RuntimeLightserverRepository(
     private val endpointSettingsStore: RpcEndpointSettingsStore,
     private val repositoryFactory: (RpcEndpoint) -> LightserverRepository = ::explorerRepositoryFor,
 ) : LightserverRepository {
+    @Volatile
+    private var lastUtxoSnapshot: UtxoDiagnosticsSnapshot? = null
+
     override suspend fun loadStatus(): NetworkIdentity {
         val endpoints = endpointSettingsStore.loadSettings().orderedEndpoints()
         require(endpoints.isNotEmpty()) { "No lightserver endpoints configured" }
         var lastFailureMessage: String? = null
+        var firstUnavailableMessage: String? = null
         for (endpoint in endpoints) {
             val repository = repositoryFactory(endpoint)
             val probe = probeRpcEndpoint(endpoint, repositoryFactory = { _ -> repository })
@@ -168,7 +173,9 @@ class RuntimeLightserverRepository(
                     return probe.status
                 }
                 probe.error?.kind == EndpointErrorKind.UNAVAILABLE -> {
-                    lastFailureMessage = probeDisplayMessage(probe)
+                    val unavailableMessage = "${endpoint.url}: ${probe.error.rawMessage ?: probe.error.message}"
+                    if (firstUnavailableMessage == null) firstUnavailableMessage = unavailableMessage
+                    lastFailureMessage = unavailableMessage
                 }
                 probe.error != null -> {
                     throw LightserverDataException(probeDisplayMessage(probe))
@@ -178,7 +185,7 @@ class RuntimeLightserverRepository(
                 }
             }
         }
-        throw LightserverDataException(lastFailureMessage ?: "No reachable Finalis lightserver endpoint")
+        throw LightserverDataException(firstUnavailableMessage ?: lastFailureMessage ?: "No reachable Finalis lightserver endpoint")
     }
 
     override suspend fun validateAddress(address: String) =
@@ -188,7 +195,11 @@ class RuntimeLightserverRepository(
         withValidatedEndpoint { repository, _, _ -> repository.loadBalance(address) }
 
     override suspend fun loadUtxos(address: String): List<WalletUtxo> =
-        withValidatedEndpoint { repository, _, _ -> repository.loadUtxos(address) }
+        withValidatedEndpoint { repository, _, _ ->
+            repository.loadUtxos(address).also {
+                lastUtxoSnapshot = repository.lastUtxoDiagnostics()
+            }
+        }
 
     override suspend fun loadHistoryPage(address: String, cursor: String?, limit: Int, fromHeight: Long?): HistoryPageResult =
         withValidatedEndpoint { repository, _, _ -> repository.loadHistoryPage(address, cursor, limit, fromHeight) }
@@ -207,12 +218,15 @@ class RuntimeLightserverRepository(
         require(endpoints.isNotEmpty()) { "No lightserver endpoints configured" }
         var lastResult: BroadcastResult? = null
         var lastFailureMessage: String? = null
+        var firstUnavailableMessage: String? = null
         for (endpoint in endpoints) {
             val repository = repositoryFactory(endpoint)
             val probe = probeRpcEndpoint(endpoint, repositoryFactory = { _ -> repository })
             if (!probe.isValid) {
                 if (probe.error?.kind == EndpointErrorKind.UNAVAILABLE) {
-                    lastFailureMessage = probeDisplayMessage(probe)
+                    val unavailableMessage = "${endpoint.url}: ${probe.error.rawMessage ?: probe.error.message}"
+                    if (firstUnavailableMessage == null) firstUnavailableMessage = unavailableMessage
+                    lastFailureMessage = unavailableMessage
                     continue
                 }
                 throw LightserverDataException(probeDisplayMessage(probe))
@@ -232,14 +246,18 @@ class RuntimeLightserverRepository(
             } catch (error: Exception) {
                 val failure = classifyEndpointFailure(error)
                 if (failure.kind == EndpointErrorKind.UNAVAILABLE) {
-                    lastFailureMessage = "${endpoint.url}: ${failure.message}"
+                    val unavailableMessage = "${endpoint.url}: ${failure.rawMessage ?: failure.message}"
+                    if (firstUnavailableMessage == null) firstUnavailableMessage = unavailableMessage
+                    lastFailureMessage = unavailableMessage
                     continue
                 }
                 throw error
             }
         }
-        return lastResult ?: throw LightserverDataException(lastFailureMessage ?: "No reachable Finalis lightserver endpoint")
+        return lastResult ?: throw LightserverDataException(firstUnavailableMessage ?: lastFailureMessage ?: "No reachable Finalis lightserver endpoint")
     }
+
+    override fun lastUtxoDiagnostics(): UtxoDiagnosticsSnapshot? = lastUtxoSnapshot
 
     private suspend fun <T> withValidatedEndpoint(
         block: suspend (LightserverRepository, NetworkIdentity, RpcEndpoint) -> T,
@@ -247,12 +265,15 @@ class RuntimeLightserverRepository(
         val endpoints = endpointSettingsStore.loadSettings().orderedEndpoints()
         require(endpoints.isNotEmpty()) { "No lightserver endpoints configured" }
         var lastFailureMessage: String? = null
+        var firstUnavailableMessage: String? = null
         for (endpoint in endpoints) {
             val repository = repositoryFactory(endpoint)
             val probe = probeRpcEndpoint(endpoint, repositoryFactory = { _ -> repository })
             if (!probe.isValid) {
                 if (probe.error?.kind == EndpointErrorKind.UNAVAILABLE) {
-                    lastFailureMessage = probeDisplayMessage(probe)
+                    val unavailableMessage = "${endpoint.url}: ${probe.error.rawMessage ?: probe.error.message}"
+                    if (firstUnavailableMessage == null) firstUnavailableMessage = unavailableMessage
+                    lastFailureMessage = unavailableMessage
                     continue
                 }
                 throw LightserverDataException(probeDisplayMessage(probe))
@@ -264,13 +285,15 @@ class RuntimeLightserverRepository(
             } catch (error: Exception) {
                 val failure = classifyEndpointFailure(error)
                 if (failure.kind == EndpointErrorKind.UNAVAILABLE) {
-                    lastFailureMessage = "${endpoint.url}: ${failure.message}"
+                    val unavailableMessage = "${endpoint.url}: ${failure.rawMessage ?: failure.message}"
+                    if (firstUnavailableMessage == null) firstUnavailableMessage = unavailableMessage
+                    lastFailureMessage = unavailableMessage
                     continue
                 }
                 throw error
             }
         }
-        throw LightserverDataException(lastFailureMessage ?: "No reachable Finalis lightserver endpoint")
+        throw LightserverDataException(firstUnavailableMessage ?: lastFailureMessage ?: "No reachable Finalis lightserver endpoint")
     }
 }
 
@@ -319,7 +342,7 @@ private fun explorerRepositoryFor(endpoint: RpcEndpoint): LightserverRepository 
 private fun probeDisplayMessage(probe: EndpointProbeResult): String =
     when {
         probe.mismatch != null -> "${probe.endpoint.url}: ${probe.mismatch.message}"
-        probe.error != null -> "${probe.endpoint.url}: ${probe.error.message}"
+        probe.error != null -> "${probe.endpoint.url}: ${probe.error.rawMessage ?: probe.error.message}"
         else -> "${probe.endpoint.url}: endpoint probe failed"
     }
 
@@ -332,38 +355,41 @@ fun classifyEndpointFailure(error: Throwable): EndpointFailure {
         is LightserverAddressException -> EndpointFailure(
             kind = if (error.wrongNetwork) EndpointErrorKind.ADDRESS_WRONG_NETWORK else EndpointErrorKind.ADDRESS_INVALID,
             message = message,
+            rawMessage = message,
         )
         is LightserverBackendIncompatibleException -> EndpointFailure(
             kind = EndpointErrorKind.INCOMPATIBLE,
             message = "The endpoint does not satisfy the live Finalis lightserver contract. $message",
+            rawMessage = message,
         )
         is LightserverRpcException -> EndpointFailure(
             kind = EndpointErrorKind.RPC_ERROR,
             message = "The lightserver returned an RPC error. $message",
+            rawMessage = message,
         )
         is LightserverDataException -> {
             val lowerMessage = message.lowercase()
             when {
                 "upstream unavailable" in lowerMessage || "unavailable" in lowerMessage || "timeout" in lowerMessage ||
                     "http 502" in lowerMessage || "http 503" in lowerMessage || "http 504" in lowerMessage ->
-                    EndpointFailure(EndpointErrorKind.UNAVAILABLE, formatEndpointErrorMessage(message))
+                    EndpointFailure(EndpointErrorKind.UNAVAILABLE, formatEndpointErrorMessage(message), rawMessage = message)
                 "http 400" in lowerMessage || "malformed address" in lowerMessage || "invalid address" in lowerMessage ->
-                    EndpointFailure(EndpointErrorKind.ADDRESS_INVALID, formatEndpointErrorMessage(message))
+                    EndpointFailure(EndpointErrorKind.ADDRESS_INVALID, formatEndpointErrorMessage(message), rawMessage = message)
                 "http 404" in lowerMessage || "not found in finalized state" in lowerMessage ->
-                    EndpointFailure(EndpointErrorKind.RPC_ERROR, formatEndpointErrorMessage(message))
+                    EndpointFailure(EndpointErrorKind.RPC_ERROR, formatEndpointErrorMessage(message), rawMessage = message)
                 "parsing failed" in lowerMessage || "malformed data" in lowerMessage || "missing result" in lowerMessage ->
-                    EndpointFailure(EndpointErrorKind.MALFORMED_DATA, formatEndpointErrorMessage(message))
+                    EndpointFailure(EndpointErrorKind.MALFORMED_DATA, formatEndpointErrorMessage(message), rawMessage = message)
                 "http " in lowerMessage ->
-                    EndpointFailure(EndpointErrorKind.RPC_ERROR, formatEndpointErrorMessage(message))
+                    EndpointFailure(EndpointErrorKind.RPC_ERROR, formatEndpointErrorMessage(message), rawMessage = message)
                 else ->
-                    EndpointFailure(EndpointErrorKind.INCOMPATIBLE, formatEndpointErrorMessage(message))
+                    EndpointFailure(EndpointErrorKind.INCOMPATIBLE, formatEndpointErrorMessage(message), rawMessage = message)
             }
         }
         else -> when {
             generateSequence(error) { it.cause }.any { it is java.io.IOException } ->
-                EndpointFailure(EndpointErrorKind.UNAVAILABLE, formatEndpointErrorMessage(message))
+                EndpointFailure(EndpointErrorKind.UNAVAILABLE, formatEndpointErrorMessage(message), rawMessage = message)
             else ->
-                EndpointFailure(EndpointErrorKind.UNKNOWN, message)
+                EndpointFailure(EndpointErrorKind.UNKNOWN, message, rawMessage = message)
         }
     }
 }
