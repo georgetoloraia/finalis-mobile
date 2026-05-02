@@ -111,7 +111,7 @@ class ExplorerRepository(
                 WalletUtxo(
                     txid = utxo.txid.lowercase(),
                     vout = utxo.vout,
-                    valueUnits = utxo.value,
+                    valueUnits = utxo.value ?: utxo.amount ?: 0L,
                     height = utxo.height,
                     scriptPubKeyHex = utxo.scriptPubKeyHex?.lowercase() ?: expectedScript,
                 )
@@ -445,7 +445,8 @@ private data class ExplorerHistoryItemDto(
 private data class ExplorerUtxoDto(
     val txid: String,
     val vout: Int,
-    val value: Long,
+    val value: Long? = null,
+    @SerialName("amount") val amount: Long? = null,
     val height: Long,
     @SerialName("script_pubkey_hex") val scriptPubKeyHex: String? = null,
 )
