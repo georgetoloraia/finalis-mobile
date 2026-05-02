@@ -83,6 +83,7 @@ enum class EndpointReachabilityState {
 enum class EndpointErrorKind {
     UNAVAILABLE,
     RPC_ERROR,
+    MALFORMED_DATA,
     INCOMPATIBLE,
     ADDRESS_INVALID,
     ADDRESS_WRONG_NETWORK,
@@ -279,6 +280,7 @@ fun buildDiagnosticsState(
             summary = when (error.kind) {
                 EndpointErrorKind.UNAVAILABLE -> "Endpoint unreachable"
                 EndpointErrorKind.RPC_ERROR -> "Endpoint RPC error"
+                EndpointErrorKind.MALFORMED_DATA -> "Endpoint returned malformed data"
                 EndpointErrorKind.INCOMPATIBLE -> "Endpoint contract incompatible"
                 EndpointErrorKind.ADDRESS_INVALID -> "Address rejected"
                 EndpointErrorKind.ADDRESS_WRONG_NETWORK -> "Address on wrong network"

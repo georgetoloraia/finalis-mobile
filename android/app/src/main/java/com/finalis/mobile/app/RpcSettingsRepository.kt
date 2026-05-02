@@ -352,7 +352,7 @@ fun classifyEndpointFailure(error: Throwable): EndpointFailure {
                 "http 404" in lowerMessage || "not found in finalized state" in lowerMessage ->
                     EndpointFailure(EndpointErrorKind.RPC_ERROR, formatEndpointErrorMessage(message))
                 "parsing failed" in lowerMessage || "malformed data" in lowerMessage || "missing result" in lowerMessage ->
-                    EndpointFailure(EndpointErrorKind.RPC_ERROR, formatEndpointErrorMessage(message))
+                    EndpointFailure(EndpointErrorKind.MALFORMED_DATA, formatEndpointErrorMessage(message))
                 "http " in lowerMessage ->
                     EndpointFailure(EndpointErrorKind.RPC_ERROR, formatEndpointErrorMessage(message))
                 else ->
