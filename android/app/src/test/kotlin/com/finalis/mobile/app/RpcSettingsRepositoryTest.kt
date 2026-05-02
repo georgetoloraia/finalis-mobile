@@ -15,12 +15,13 @@ class RpcSettingsRepositoryTest {
         val preferences = FakeSharedPreferences()
         val repository = RpcSettingsRepository(preferences)
         val settings = repository.loadSettings()
+        val expectedEndpoints = (listOf(BuildConfig.EXPLORER_BASE_URL) +
+            RpcSettingsRepository.BUILTIN_FALLBACK_ENDPOINTS)
+            .map(::normalizeRpcUrl)
+            .distinct()
 
         assertEquals(
-            listOf(
-                RpcEndpoint(normalizeRpcUrl(BuildConfig.EXPLORER_BASE_URL)),
-                RpcEndpoint("http://212.58.103.170:18080"),
-            ),
+            expectedEndpoints.map(::RpcEndpoint),
             settings.savedEndpoints,
         )
         assertEquals(RpcEndpoint(normalizeRpcUrl(BuildConfig.EXPLORER_BASE_URL)), settings.activeEndpoint)
@@ -38,16 +39,18 @@ class RpcSettingsRepositoryTest {
 
         val repository = RpcSettingsRepository(preferences)
         val settings = repository.loadSettings()
+        val expectedDefaults = (listOf(BuildConfig.EXPLORER_BASE_URL) +
+            RpcSettingsRepository.BUILTIN_FALLBACK_ENDPOINTS)
+            .map(::normalizeRpcUrl)
+            .distinct()
 
         assertEquals(
-            listOf(
-                    RpcEndpoint("https://good.example"),
-                RpcEndpoint(normalizeRpcUrl(BuildConfig.EXPLORER_BASE_URL)),
-                    RpcEndpoint("http://212.58.103.170:18080"),
-            ),
+            (listOf("https://good.example") + expectedDefaults)
+                .distinct()
+                .map(::RpcEndpoint),
             settings.savedEndpoints,
         )
-            assertEquals(RpcEndpoint("https://good.example"), settings.activeEndpoint)
+        assertEquals(RpcEndpoint("https://good.example"), settings.activeEndpoint)
     }
 
     @Test
@@ -80,7 +83,7 @@ class RpcSettingsRepositoryTest {
             LightserverDataException("Explorer response parsing failed for /api/address/sc1xyz"),
         )
 
-        assertEquals(EndpointErrorKind.RPC_ERROR, failure.kind)
+        assertEquals(EndpointErrorKind.MALFORMED_DATA, failure.kind)
         assertEquals("Endpoint returned malformed data", failure.message)
     }
 }

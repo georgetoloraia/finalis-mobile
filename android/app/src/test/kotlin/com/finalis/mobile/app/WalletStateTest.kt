@@ -158,6 +158,22 @@ class WalletStateTest {
     }
 
     @Test
+    fun `build diagnostics state uses malformed data summary for malformed endpoint responses`() {
+        val diagnostics = buildDiagnosticsState(
+            activeEndpoint = RpcEndpoint("https://broken.example/rpc"),
+            status = null,
+            error = EndpointFailure(
+                kind = EndpointErrorKind.MALFORMED_DATA,
+                message = "Endpoint returned malformed data",
+            ),
+        )
+
+        assertEquals(EndpointReachabilityState.REACHABLE, diagnostics.endpointHealth.reachability)
+        assertEquals(SyncTrustState.DEGRADED, diagnostics.endpointHealth.syncTrust)
+        assertEquals("Endpoint returned malformed data", diagnostics.endpointHealth.summary)
+    }
+
+    @Test
     fun `append history page merges entries and carries cursor state`() {
         val initial = FinalizedHistoryState(
             entries = listOf(
