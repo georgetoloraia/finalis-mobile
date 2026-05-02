@@ -236,7 +236,13 @@ class ExplorerHttpTransport(
             val stream = if (statusCode in 200..299) connection.inputStream else connection.errorStream
             val responseBody = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
             when {
-                statusCode == 404 -> throw LightserverRpcException(-32001, "Not found")
+                statusCode == 404 -> {
+                    val message = runCatching {
+                        errorJson.decodeFromString<ExplorerErrorEnvelopeDto>(responseBody)
+                            .error?.message ?: "Not found"
+                    }.getOrElse { "Not found" }
+                    throw LightserverRpcException(-32001, message)
+                }
                 statusCode !in 200..299 -> {
                     val message = runCatching {
                         errorJson.decodeFromString<ExplorerErrorEnvelopeDto>(responseBody)

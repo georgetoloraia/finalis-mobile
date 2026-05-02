@@ -341,11 +341,23 @@ fun classifyEndpointFailure(error: Throwable): EndpointFailure {
             kind = EndpointErrorKind.RPC_ERROR,
             message = "The lightserver returned an RPC error. $message",
         )
-        is LightserverDataException -> when {
-            "unavailable" in message.lowercase() || "timeout" in message.lowercase() || "http " in message.lowercase() ->
-                EndpointFailure(EndpointErrorKind.UNAVAILABLE, formatEndpointErrorMessage(message))
-            else ->
-                EndpointFailure(EndpointErrorKind.INCOMPATIBLE, formatEndpointErrorMessage(message))
+        is LightserverDataException -> {
+            val lowerMessage = message.lowercase()
+            when {
+                "upstream unavailable" in lowerMessage || "unavailable" in lowerMessage || "timeout" in lowerMessage ||
+                    "http 502" in lowerMessage || "http 503" in lowerMessage || "http 504" in lowerMessage ->
+                    EndpointFailure(EndpointErrorKind.UNAVAILABLE, formatEndpointErrorMessage(message))
+                "http 400" in lowerMessage || "malformed address" in lowerMessage || "invalid address" in lowerMessage ->
+                    EndpointFailure(EndpointErrorKind.ADDRESS_INVALID, formatEndpointErrorMessage(message))
+                "http 404" in lowerMessage || "not found in finalized state" in lowerMessage ->
+                    EndpointFailure(EndpointErrorKind.RPC_ERROR, formatEndpointErrorMessage(message))
+                "parsing failed" in lowerMessage || "malformed data" in lowerMessage || "missing result" in lowerMessage ->
+                    EndpointFailure(EndpointErrorKind.RPC_ERROR, formatEndpointErrorMessage(message))
+                "http " in lowerMessage ->
+                    EndpointFailure(EndpointErrorKind.RPC_ERROR, formatEndpointErrorMessage(message))
+                else ->
+                    EndpointFailure(EndpointErrorKind.INCOMPATIBLE, formatEndpointErrorMessage(message))
+            }
         }
         else -> when {
             generateSequence(error) { it.cause }.any { it is java.io.IOException } ->
@@ -358,10 +370,16 @@ fun classifyEndpointFailure(error: Throwable): EndpointFailure {
 
 private fun formatEndpointErrorMessage(message: String): String =
     when {
-        "upstream unavailable" in message.lowercase() || "unavailable" in message.lowercase() -> "The lightserver is unavailable"
-        "timeout" in message.lowercase() -> "The lightserver request timed out"
-        "parsing failed" in message.lowercase() -> "The lightserver returned malformed data"
-        "missing result" in message.lowercase() -> "The lightserver response was incomplete"
-        "http " in message.lowercase() -> "The lightserver returned an HTTP error"
+        "upstream unavailable" in message.lowercase() || "unavailable" in message.lowercase() ||
+            "http 502" in message.lowercase() || "http 503" in message.lowercase() || "http 504" in message.lowercase() ->
+            "Read endpoint unavailable"
+        "timeout" in message.lowercase() -> "Read endpoint request timed out"
+        "parsing failed" in message.lowercase() || "malformed data" in message.lowercase() -> "Endpoint returned malformed data"
+        "missing result" in message.lowercase() -> "Endpoint response was incomplete"
+        "http 400" in message.lowercase() || "malformed address" in message.lowercase() || "invalid address" in message.lowercase() ->
+            "Address is invalid for this network"
+        "http 404" in message.lowercase() || "not found in finalized state" in message.lowercase() ->
+            "Not found in finalized state"
+        "http " in message.lowercase() -> "Endpoint returned an HTTP error"
         else -> message
     }

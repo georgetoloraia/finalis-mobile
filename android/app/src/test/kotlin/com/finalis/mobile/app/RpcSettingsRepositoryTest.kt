@@ -1,8 +1,11 @@
 package com.finalis.mobile.app
 
 import android.content.SharedPreferences
+import com.finalis.mobile.data.lightserver.LightserverDataException
+import com.finalis.mobile.data.lightserver.LightserverRpcException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class RpcSettingsRepositoryTest {
 
@@ -45,6 +48,40 @@ class RpcSettingsRepositoryTest {
             settings.savedEndpoints,
         )
             assertEquals(RpcEndpoint("https://good.example"), settings.activeEndpoint)
+    }
+
+    @Test
+    fun `classify explorer HTTP 502 as unavailable`() {
+        val failure = classifyEndpointFailure(LightserverDataException("Explorer: HTTP 502"))
+
+        assertEquals(EndpointErrorKind.UNAVAILABLE, failure.kind)
+        assertEquals("Read endpoint unavailable", failure.message)
+    }
+
+    @Test
+    fun `classify explorer HTTP 400 malformed address as address invalid`() {
+        val failure = classifyEndpointFailure(LightserverDataException("Explorer: malformed address"))
+
+        assertEquals(EndpointErrorKind.ADDRESS_INVALID, failure.kind)
+        assertEquals("Address is invalid for this network", failure.message)
+    }
+
+    @Test
+    fun `classify explorer not found as rpc error`() {
+        val failure = classifyEndpointFailure(LightserverRpcException(-32001, "not found in finalized state"))
+
+        assertEquals(EndpointErrorKind.RPC_ERROR, failure.kind)
+        assertTrue(failure.message.contains("not found in finalized state", ignoreCase = true))
+    }
+
+    @Test
+    fun `classify explorer parse failures as rpc error malformed data`() {
+        val failure = classifyEndpointFailure(
+            LightserverDataException("Explorer response parsing failed for /api/address/sc1xyz"),
+        )
+
+        assertEquals(EndpointErrorKind.RPC_ERROR, failure.kind)
+        assertEquals("Endpoint returned malformed data", failure.message)
     }
 }
 
