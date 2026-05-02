@@ -38,10 +38,17 @@ class ExplorerRepository(
     private val explorerTransport = ExplorerHttpTransport(explorerBaseUrl)
     private val rpcTransport = UrlConnectionLightserverTransport(lightserverRpcUrl)
 
+    /** Cached status DTO from the last successful [loadStatus] call. Used by [loadBalance] to avoid a
+     *  redundant /api/status round-trip when called through [withValidatedEndpoint], which already
+     *  probed the endpoint via [loadStatus] on the same instance before invoking [loadBalance]. */
+    @Volatile
+    private var lastStatusDto: ExplorerStatusDto? = null
+
     // ── Status ───────────────────────────────────────────────────────────────
 
     override suspend fun loadStatus(): NetworkIdentity {
         val status = explorerGet<ExplorerStatusDto>("/api/status")
+        lastStatusDto = status
         if (!status.finalizedOnly) {
             throw LightserverBackendIncompatibleException(
                 "Explorer is not in finalized-only mode (finalized_only was false)",
@@ -76,14 +83,16 @@ class ExplorerRepository(
 
     override suspend fun loadBalance(address: String): BalanceSnapshot {
         val validation = requireValidAddress(address)
-        val status = explorerGet<ExplorerStatusDto>("/api/status")
+        // Re-use the status already fetched by probeRpcEndpoint (same ExplorerRepository instance);
+        // fall back to a fresh /api/status call only when the cache is absent.
+        val statusDto = lastStatusDto ?: explorerGet<ExplorerStatusDto>("/api/status")
         val addressData = explorerGet<ExplorerAddressDto>("/api/address/${validation.normalizedAddress}")
         return BalanceSnapshot(
             address = WalletAddress(validation.normalizedAddress!!),
             confirmedUnits = addressData.finalizedBalance,
             asset = "FINALIS",
-            tipHeight = status.finalizedHeight,
-            tipHash = status.finalizedTransitionHash,
+            tipHeight = statusDto.finalizedHeight,
+            tipHash = statusDto.finalizedTransitionHash,
         )
     }
 
