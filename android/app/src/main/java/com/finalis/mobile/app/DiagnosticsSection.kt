@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.finalis.mobile.core.wallet.FinalisMainnet
 import com.finalis.mobile.core.wallet.WalletSendService
+import com.finalis.mobile.data.lightserver.rpcUrlFromExplorerUrl
 
 @Composable
 fun EndpointHealthBanner(
@@ -76,6 +77,7 @@ fun DiagnosticsSection(
             EndpointSettingsBlock(
                 rpcSettingsState = rpcSettingsState,
                 endpointHealth = endpointHealth,
+                endpointProbes = diagnosticsState.endpointProbes,
                 onRpcEndpointInputChange = onRpcEndpointInputChange,
                 onAddEndpoint = onAddEndpoint,
                 onSelectEndpoint = onSelectEndpoint,
@@ -100,6 +102,9 @@ fun DiagnosticsSection(
                     fallbackReason = status.checkpointFallbackReason,
                     fallbackSticky = status.fallbackSticky,
                     adaptiveSummary = buildAdaptiveSummary(status),
+                    utxoDiagnostics = diagnosticsState.utxoDiagnostics?.let { snapshot ->
+                        "total ${snapshot.totalReturned}, finalized-kept ${snapshot.finalizedKept}, filtered-pending ${snapshot.filteredPending}"
+                    },
                 )
             }
             if (diagnosticsState.txDebugRecords.isNotEmpty()) {
@@ -151,6 +156,27 @@ private fun EndpointHealthSummary(
             monospace = true,
         )
     }
+    endpointHealth.resolvedExplorerUrl?.let {
+        LabelValue(
+            label = "Resolved explorer URL",
+            value = it,
+            monospace = true,
+        )
+    }
+    endpointHealth.resolvedRpcUrl?.let {
+        LabelValue(
+            label = "Resolved RPC URL",
+            value = it,
+            monospace = true,
+        )
+    }
+    endpointHealth.errorMessage?.let {
+        LabelValue(
+            label = "Raw transport error",
+            value = it,
+            monospace = true,
+        )
+    }
     endpointHealth.status?.let { status ->
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             StatusChip(text = "Height ${(status.finalizedHeight ?: status.tipHeight)}")
@@ -170,6 +196,7 @@ private fun AdvancedConnectionBlock(
     fallbackReason: String?,
     fallbackSticky: Boolean?,
     adaptiveSummary: String?,
+    utxoDiagnostics: String?,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -196,6 +223,7 @@ private fun AdvancedConnectionBlock(
                     fallbackReason?.let { LabelValue(label = "Fallback reason", value = it) }
                     fallbackSticky?.let { LabelValue(label = "Sticky fallback", value = it.toString()) }
                     adaptiveSummary?.let { LabelValue(label = "Adaptive regime", value = it) }
+                    utxoDiagnostics?.let { LabelValue(label = "UTXO ingest", value = it) }
                 }
             }
         }
@@ -293,6 +321,7 @@ private fun abbreviateDebugTxid(txid: String): String =
 private fun EndpointSettingsBlock(
     rpcSettingsState: RpcSettingsState,
     endpointHealth: EndpointHealthState,
+    endpointProbes: List<EndpointProbeResult>,
     onRpcEndpointInputChange: (String) -> Unit,
     onAddEndpoint: () -> Unit,
     onSelectEndpoint: (RpcEndpoint) -> Unit,
@@ -315,8 +344,8 @@ private fun EndpointSettingsBlock(
             value = rpcSettingsState.inputValue,
             onValueChange = onRpcEndpointInputChange,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Add RPC endpoint") },
-            placeholder = { Text("https://lightserver.example.com/rpc") },
+            label = { Text("Add endpoint URL") },
+            placeholder = { Text("http://lightserver.example.com:18080") },
             singleLine = true,
         )
 
@@ -328,10 +357,12 @@ private fun EndpointSettingsBlock(
             EmptyHint("No runtime endpoints are saved yet. The build default endpoint will be used until one is added.")
         } else {
             rpcSettingsState.savedEndpoints.forEach { endpoint ->
+                val endpointProbe = endpointProbes.firstOrNull { it.endpoint.url == endpoint.url }
                 RpcEndpointRow(
                     endpoint = endpoint,
                     isActive = endpoint.url == rpcSettingsState.activeEndpoint?.url,
                     endpointHealth = endpointHealth.takeIf { endpoint.url == rpcSettingsState.activeEndpoint?.url },
+                    endpointProbe = endpointProbe,
                     onSelectEndpoint = { onSelectEndpoint(endpoint) },
                     onRemoveEndpoint = { onRemoveEndpoint(endpoint) },
                 )
@@ -345,6 +376,7 @@ private fun RpcEndpointRow(
     endpoint: RpcEndpoint,
     isActive: Boolean,
     endpointHealth: EndpointHealthState?,
+    endpointProbe: EndpointProbeResult?,
     onSelectEndpoint: () -> Unit,
     onRemoveEndpoint: () -> Unit,
 ) {
@@ -356,6 +388,16 @@ private fun RpcEndpointRow(
             Text(
                 text = endpoint.url,
                 fontFamily = FontFamily.Monospace,
+            )
+            LabelValue(
+                label = "Explorer URL",
+                value = endpoint.url,
+                monospace = true,
+            )
+            LabelValue(
+                label = "RPC URL",
+                value = rpcUrlFromExplorerUrl(endpoint.url),
+                monospace = true,
             )
             if (endpointHealth != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -382,6 +424,19 @@ private fun RpcEndpointRow(
                         tone = endpointHealth.syncTrust.toStatusTone(),
                     )
                 }
+            }
+            endpointProbe?.error?.let { failure ->
+                LabelValue(
+                    label = "Last probe error",
+                    value = failure.rawMessage ?: failure.message,
+                    monospace = true,
+                )
+            }
+            endpointProbe?.status?.let { status ->
+                LabelValue(
+                    label = "Last probe finalized height",
+                    value = (status.finalizedHeight ?: status.tipHeight).toString(),
+                )
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),

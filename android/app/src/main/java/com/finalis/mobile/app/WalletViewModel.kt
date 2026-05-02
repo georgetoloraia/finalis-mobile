@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import com.finalis.mobile.core.model.HistoryEntry
 import com.finalis.mobile.core.model.HistoryPageResult
 import com.finalis.mobile.core.model.ImportedWalletRecord
+import com.finalis.mobile.core.model.BalanceSnapshot
 import com.finalis.mobile.core.model.SubmittedTransactionRecord
 import com.finalis.mobile.core.wallet.SubmittedTransactionManager
 import com.finalis.mobile.core.wallet.WalletNetworkGuard
@@ -87,7 +88,7 @@ class WalletViewModel(
         )
     }
 
-    fun syncRpcSettingsState(message: String? = rpcSettingsState.message) {
+    fun syncRpcSettingsState(message: String? = null) {
         rpcSettingsState = rpcSettingsRepository.loadUiState(
             inputValue = rpcSettingsState.inputValue,
             message = message,
@@ -275,7 +276,10 @@ class WalletViewModel(
         val targetWallet = loadedWallet ?: return
         val generation = ++refreshGeneration
         var validatedStatus: com.finalis.mobile.core.model.NetworkIdentity? = null
-        readState = DashboardState.Loading
+        val previousState = readState
+        if (previousState !is DashboardState.Ready) {
+            readState = DashboardState.Loading
+        }
         beginRefresh()
         try {
             refreshMutex.withLock {
@@ -291,6 +295,7 @@ class WalletViewModel(
                         activeEndpoint = rpcSettingsState.activeEndpoint,
                         status = status,
                         mismatch = mismatch,
+                        utxoDiagnostics = null,
                     )
                     readState = if (mismatch != null) {
                         DashboardState.NetworkMismatch(
@@ -306,6 +311,13 @@ class WalletViewModel(
                         val walletAddress = targetWallet.walletProfile.address.value
                         val balance = withContext(Dispatchers.IO) { repository.loadBalance(walletAddress) }
                         val utxos = withContext(Dispatchers.IO) { repository.loadUtxos(walletAddress) }
+                        val effectiveBalance = BalanceSnapshot(
+                            address = balance.address,
+                            confirmedUnits = balance.confirmedUnits,
+                            asset = balance.asset,
+                            tipHeight = balance.tipHeight,
+                            tipHash = balance.tipHash,
+                        )
                         val historyPage = loadLatestHistoryBootstrapPage(
                             repository = repository,
                             address = walletAddress,
@@ -336,7 +348,7 @@ class WalletViewModel(
                             }.getOrNull()
                         }
                         val funds = summarizeWalletFunds(
-                            finalizedBalance = balance.confirmedUnits,
+                            finalizedBalance = effectiveBalance.confirmedUnits,
                             finalizedUtxos = utxos,
                             submitted = reconciliation.remainingSubmitted,
                         )
@@ -359,10 +371,11 @@ class WalletViewModel(
                             activeEndpoint = rpcSettingsState.activeEndpoint,
                             status = status,
                             txDebugRecords = txDebugRecords,
+                            utxoDiagnostics = repository.lastUtxoDiagnostics(),
                         )
                         DashboardState.Ready(
                             status = status,
-                            balance = balance,
+                            balance = effectiveBalance,
                             reservedUnits = funds.reservedUnits,
                             spendableUnits = funds.spendableUnits,
                             historyState = historyState,
@@ -393,7 +406,13 @@ class WalletViewModel(
                 )
             }
             if (generation == refreshGeneration) {
-                readState = DashboardState.Error(friendlyError)
+                val previousReadyState = previousState as? DashboardState.Ready
+                if (previousReadyState != null && failure.kind == EndpointErrorKind.UNAVAILABLE) {
+                    // Preserve last known-good wallet view on transient transport failures.
+                    readState = previousReadyState
+                } else {
+                    readState = DashboardState.Error(friendlyError)
+                }
             }
         } finally {
             syncRpcSettingsState()
@@ -418,9 +437,16 @@ class WalletViewModel(
                 activeEndpoint = null,
                 status = null,
                 error = null,
+                endpointProbes = emptyList(),
             )
             return
         }
+        val probes = withContext(Dispatchers.IO) {
+            val endpoints = rpcSettingsRepository.loadSettings().orderedEndpoints()
+            endpoints.map { endpoint -> probeRpcEndpoint(endpoint) }
+        }
+        val activeProbe = probes.firstOrNull { it.endpoint.url == rpcSettingsState.activeEndpoint?.url }
+        val selectedProbe = activeProbe ?: probes.firstOrNull()
         try {
             val status = withContext(Dispatchers.IO) { repository.loadStatus() }
             syncRpcSettingsState()
@@ -429,13 +455,15 @@ class WalletViewModel(
                 activeEndpoint = rpcSettingsState.activeEndpoint,
                 status = status,
                 mismatch = mismatch,
+                endpointProbes = probes,
             )
         } catch (error: Exception) {
             syncRpcSettingsState()
             diagnosticsState = buildDiagnosticsState(
                 activeEndpoint = rpcSettingsState.activeEndpoint,
                 status = null,
-                error = classifyEndpointFailure(error),
+                error = selectedProbe?.error ?: classifyEndpointFailure(error),
+                endpointProbes = probes,
             )
         }
     }

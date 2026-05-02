@@ -46,7 +46,7 @@ fun SendSection(
         if (finalizedBalanceUnits != null || spendableUnits != null) {
             finalizedBalanceUnits?.let { finalizedBalance ->
                 LabelValue(
-                    label = "Finalized balance",
+                    label = "Spendable balance",
                     value = formatFinalisAmountLabel(finalizedBalance),
                     emphasize = true,
                 )
